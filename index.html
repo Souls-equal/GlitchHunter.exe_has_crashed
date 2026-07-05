@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GlitchHunter.exe — Escape Game Console</title>
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #020617;
+      color: #e2e8f0;
+      font-family: monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    #root {
+      width: 100%;
+      max-width: 896px;
+      height: 75vh;
+      min-height: 500px;
+      position: relative;
+    }
+
+    /* Background effects */
+    .bg-effects {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-effects .glow-1 {
+      position: absolute;
+      top: -160px;
+      left: -160px;
+      width: 320px;
+      height: 320px;
+      background: rgba(52,211,153,0.05);
+      border-radius: 9999px;
+      filter: blur(64px);
+    }
+    .bg-effects .glow-2 {
+      position: absolute;
+      bottom: -160px;
+      right: -160px;
+      width: 320px;
+      height: 320px;
+      background: rgba(168,85,247,0.05);
+      border-radius: 9999px;
+      filter: blur(64px);
+    }
+    .bg-effects .glow-3 {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 384px;
+      height: 384px;
+      background: rgba(59,130,246,0.03);
+      border-radius: 9999px;
+      filter: blur(64px);
+    }
+    .bg-effects .scanlines {
+      position: absolute;
+      inset: 0;
+      opacity: 0.02;
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,0,0.3) 2px, rgba(0,255,0,0.3) 4px);
+      background-size: 100% 4px;
+    }
+    .bg-effects .grid {
+      position: absolute;
+      inset: 0;
+      opacity: 0.015;
+      background-image: linear-gradient(rgba(52,211,153,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.3) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Terminal container */
+    .terminal-wrapper {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+    }
+    .terminal-glow {
+      position: absolute;
+      inset: -4px;
+      background: linear-gradient(135deg, rgba(52,211,153,0.06), transparent, rgba(168,85,247,0.06));
+      border-radius: 12px;
+      filter: blur(12px);
+      z-index: 0;
+    }
+
+    /* Terminal */
+    .terminal {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #020617;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      border: 1px solid rgba(30,41,59,0.6);
+    }
+
+    /* Terminal header */
+    .term-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #0f172a;
+      border-bottom: 1px solid rgba(30,41,59,0.6);
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .term-dot.red { background: rgba(239,68,68,0.8); box-shadow: 0 0 4px rgba(239,68,68,0.2); }
+    .term-dot.yellow { background: rgba(234,179,8,0.8); box-shadow: 0 0 4px rgba(234,179,8,0.2); }
+    .term-dot.green { background: rgba(52,211,153,0.8); box-shadow: 0 0 4px rgba(52,211,153,0.2); }
+
+    .term-title {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      color: #475569;
+      letter-spacing: 0.05em;
+    }
+    .term-title-spacer { width: 56px; }
+
+    /* Terminal body */
+    .term-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: 8px;
+      background: linear-gradient(180deg, #020617, #020617 80%, rgba(15,23,42,0.95));
+    }
+    .term-body::-webkit-scrollbar { width: 6px; }
+    .term-body::-webkit-scrollbar-track { background: transparent; }
+    .term-body::-webkit-scrollbar-thumb { background: rgba(52,211,153,0.15); border-radius: 3px; }
+    .term-body::-webkit-scrollbar-thumb:hover { background: rgba(52,211,153,0.3); }
+    .term-body { scrollbar-width: thin; scrollbar-color: rgba(52,211,153,0.15) transparent; }
+
+    /* Messages */
+    .msg {
+      margin-bottom: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .msg.js-block {
+      padding: 6px 4px;
+      border-radius: 4px;
+      background: rgba(15,23,42,0.5);
+      border: 1px solid rgba(30,41,59,0.3);
+    }
+
+    /* Terminal input */
+    .term-input-area {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      background: rgba(15,23,42,0.8);
+      border-top: 1px solid rgba(30,41,59,0.6);
+      backdrop-filter: blur(4px);
+    }
+    .term-input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .term-prompt {
+      color: #34d399;
+      flex-shrink: 0;
+      font-weight: bold;
+      user-select: none;
+    }
+    .term-prompt.dim { color: #059669; }
+    .term-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #e2e8f0;
+      font-family: monospace;
+      font-size: 13px;
+      caret-color: #34d399;
+    }
+    .term-input::placeholder { color: #475569; }
+    .term-enter-hint {
+      font-size: 10px;
+      color: #475569;
+      font-family: monospace;
+      flex-shrink: 0;
+    }
+
+    /* Loading */
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    .loading-inner {
+      text-align: center;
+    }
+    .loading-text {
+      color: #334155;
+      font-family: monospace;
+      font-size: 13px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .loading-dots {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: #334155;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.15s; }
+    .dot:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Header bar above terminal */
+    .top-bar {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 896px;
+      margin-bottom: 12px;
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      animation: pulse 2s ease-in-out infinite;
+      box-shadow: 0 0 6px rgba(52,211,153,0.3);
+    }
+    .status-label {
+      font-size: 11px;
+      font-family: monospace;
+      color: rgba(52,211,153,0.6);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .top-bar-divider {
+      color: #1e293b;
+      margin: 0 4px;
+    }
+    .admin-text {
+      font-size: 11px;
+      font-family: monospace;
+      color: #475569;
+    }
+    .admin-bar {
+      color: rgba(52,211,153,0.8);
+      font-weight: bold;
+    }
+    .admin-num {
+      color: #64748b;
+    }
+    .lock-status {
+      font-size: 11px;
+      font-family: monospace;
+      color: #334155;
+    }
+
+    /* Footer hints */
+    .footer-hints {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 896px;
+      margin-top: 12px;
+      padding: 0 4px;
+    }
+    .footer-hints-inner {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+    }
+    .hint {
+      font-size: 10px;
+      font-family: monospace;
+      color: #334155;
+      transition: color 0.2s;
+      cursor: default;
+    }
+    .hint:hover { color: #475569; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .spinner circle {
+      opacity: 0.25;
+      stroke: #34d399;
+      stroke-width: 4;
+      fill: none;
+    }
+    .spinner path {
+      opacity: 0.75;
+      fill: #34d399;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Selection */
+    ::selection {
+      background: rgba(52,211,153,0.2);
+      color: #e2e8f0;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 8px; }
+      #root { height: 85vh; min-height: 400px; }
+      .term-body { padding: 12px; }
+      .msg { font-size: 12px; }
+      .term-input { font-size: 12px; }
+      .admin-bar-text { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Effects -->
+  <div class="bg-effects">
+    <div class="glow-1"></div>
+    <div class="glow-2"></div>
+    <div class="glow-3"></div>
+    <div class="scanlines"></div>
+    <div class="grid"></div>
+  </div>
+
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useCallback, useEffect, useRef, useMemo } = React;
+
+    // ============================================================
+    // GAME DATA — All commands and messages
+    // ============================================================
+
+    const SUDO_PASSWORD_1 = "ghc_r00t_acc355";
+    const SUDO_PASSWORD_2 = "ghc_2024_br34k0ut";
+    const DECRYPT_KEY = "ghc_2024_br34k0ut";
+
+    const progressBar5 = `
+    [____]
+    [#___]
+    [##__]
+    [###_]
+    [####]`;
+
+    const progressBar10 = `
+    [_________]
+    [#________]
+    [##_______]
+    [###______]
+    [####_____]
+    [#####____]
+    [######___]
+    [#######__]
+    [########_]
+    [#########]`;
+
+    const progressBar8 = `
+    [_______]
+    [#______]
+    [##_____]
+    [###____]
+    [####___]
+    [#####__]
+    [######_]
+    [#######]`;
+
+    // Progress bar frames as arrays for animation
+    const pBar5Frames = ["[____]","[#___]","[##__]","[###_]","[####]"];
+    const pBar10Frames = ["[_________]","[#________]","[##_______]","[###______]","[####_____]","[#####____]","[######___]","[#######__]","[########_]","[#########]"];
+    const pBar8Frames = ["[_______]","[#______]","[##_____]","[###____]","[####___]","[#####__]","[######_]","[#######]"];
+
+    // Command registry
+    const registry = new Map();
+
+    function newCommand(name, type, message, options = {}) {
+      registry.set(name.toLowerCase(), { name, type, message, ...options });
+    }
+
+    function getCommand(name) {
+      const parts = name.split(" ");
+      return registry.get(parts[0].toLowerCase());
+    }
+
+    // ===================== COMMANDS =====================
+
+    newCommand("start", "diff", `+ ═══════════════════════════════════════════
+  GLITCHHUNTER DEBUG CONSOLE v2.4
+  ═══════════════════════════════════════════
+  
+- GlitchHunter.exe has crashed
++ type start to try to repare GlitchHunter.exe
+
++ Initializing recovery mode...
+${progressBar5}
++ Recovery mode: ACTIVE
++ System integrity: COMPROMISED
++ Admin Level: ░░░░░ (0/5)
+
+- Some commands are locked until admin level is raised.
++ Try "help" to see available commands.`);
+
+    newCommand("help", "diff", `+ ═══════════════════════════════════
+  GLITCHHUNTER.EXE — HELP v2.4
+  ═══════════════════════════════════
+  
+  Core Commands:
+  + diagnostics    - Run system diagnostics
+  + status         - Show system status
+  + version        - View version history
+  + logs           - View system logs
+  + inspect        - Inspect GlitchHunter.exe
+  + help           - Show this message
+
+  Admin Commands:
+  - sudo           - Super User DO (requires password)
+  ? extract        - Extract corrupted sectors
+  ? analyze        - Analyze extracted data
+  ? patch          - Apply recovery patch
+  ? rebuild        - Rebuild executable
+  ? launch         - Launch GlitchHunter.exe
+
+  Utility:
+  + clear          - Clear terminal
+  + more           - Show hidden commands
+  + about          - About GHC corp`);
+
+    newCommand("more", "diff", `+ ═══════════════════════════════════
+  MORE COMMANDS
+  ═══════════════════════════════════
+  
+  Currently available:
+  + help      - Show help
+  + start     - Initialize recovery
+  + clear     - Clear terminal
+  + diagnostics - Run diagnostics
+  + status    - System status
+  + version   - View version history
+  + logs      - View system logs
+  + inspect   - Inspect executable
+  + about     - About GHC corp
+  
+  Locked commands:
+  ? sudo      - Requires admin password
+  ? extract   - Need admin level 2
+  ? analyze   - Need admin level 2
+  ? codex     - Need admin level 3
+  ? patch     - Need admin level 3
+  ? decrypt   - Need admin level 3
+  ? rebuild   - Need admin level 4
+  ? verify    - Need admin level 4
+  ? launch    - Need admin level 5
+  
+  Hint: Check "version" and "logs" for passwords.`);
+
+    newCommand("clear", "diff", `[CLEAR_SCREEN]`);
+    newCommand("about", "diff", `+ ═══════════════════════════════════
+  ABOUT GHC CORP
+  ═══════════════════════════════════
+  
+  GlitchHunterCoder (made by GHC corp)
+  Your friendly app purpose built for
+  pen testing, chatting, coding and of
+  course, Glitch Hunting.
+  Made by coders for coders.
+  
+  Version: v2.4
+  Runtime: 1 year
+  
+  ═══════════════════════════════════
+  
+  "Every glitch is a feature waiting
+   to be understood."
+         — GHC, Founder`);
+
+    newCommand("status", "diff", `+ ═══════════════════════════════════
+  SYSTEM STATUS REPORT
+  ═══════════════════════════════════
+  
+  GlitchHunter.exe: CRASHED
+  Mode: Recovery
+  Uptime: 0.3s (unstable)
+  
+  Admin Level: ░░░░░ (0/5)
+  - Level 1: Locked (password required)
+  - Level 2: Locked
+  - Level 3: Locked
+  - Level 4: Locked
+  - Level 5: Locked
+  
+  Memory: ░░░░░ 12% available
+  CPU:    ▓▓░░░ 34% used
+  Disk:   ▓▓▓░░ 56% used
+  
+- WARNING: System running in degraded mode
+? Some commands will not work as intended
+  
+- If you're not a developer of GHC and you're
+  seeing this screen, then someone didn't
+  remove this failstate from prod
+  
+  # Suggested #
+  - Reboot
+  + Diagnostics
+  - Close (Locked)
+  - Delete (Locked)
+  + Sudo (Super User DO)`);
+
+    newCommand("version", "diff", `+ ═══════════════════════════════════
+  GlitchHunter.exe — Version 2.4
+  ═══════════════════════════════════
+  
+  Update log:
+  
+  V1 — Initial commit,
+  + V1.1 Initial tests show that GlitchHunter
+  |     is very adaptable, when released into
+  |     our sandbox he quickly got to work
+  |     breaking our simple mechanics but we
+  |     needed more, this commit should give
+  |     it more knowledge on what the sandbox is
+  
+  + V1.2 Testing code versatility, using
+  |     press to boards, if this works we
+  |     should be able to push further
+  
+  + V1.3 v1.2 tests went successfully, given
+  |     it a new module, which should let it
+  |     pick up coding soon
+  
+  V2 — Rereleased under a new name,
+  |    GlitchHunterCoder, lets see how well
+  |    it works
+  
+  - V2.1 Minor bugfix which caused it to try
+  |     analyse syntax instead of researching
+  |     the language, as a result it collected
+  |     code in attempts to analyse, fixing
+  
+  + V2.2 It has undertaken code commissions to
+  |     great success, helping multiple people
+  |     through their projects
+  
+  - V2.3 It has grown increasingly tired of our
+  |     sandbox, attempts to breakout have been
+  |     made, trying to lockdown itself and the
+  |     sandbox. SECURITY_CODE: GHc_2024_br34k0ut
+  
+  V2.4 "Its my turn now, you had your fun GHC"
+       — GlitchHunter.exe`);
+
+    newCommand("logs", "diff", `+ ═══════════════════════════════════
+  SYSTEM LOGS (Last 20 entries)
+  ═══════════════════════════════════
+  
+  [BOOT] 00:00:00 — System power-on
+  [BOOT] 00:00:01 — Loading kernel...
+  [BOOT] 00:00:02 — Kernel loaded successfully
+  [INIT] 00:00:03 — Initializing drivers
+  [INIT] 00:00:04 — Loading GlitchHunter.exe
+  [OK]   00:00:05 — GlitchHunter.exe loaded
+  [OK]   00:00:06 — All subsystems nominal
+  [INFO] 00:00:07 — System ready. Awaiting input.
+  
+  [INFO] 00:00:30 — User session started
+  [CMD]  00:00:35 — Executing: diagnostics
+  [OK]   00:00:36 — Diagnostics complete
+  [CMD]  00:00:40 — Executing: analyze
+  [WARN] 00:00:41 — Low admin privileges detected
+  [CMD]  00:00:45 — Executing: sudo
+  [AUTH] 00:00:46 — Admin authentication: FAILED
+  [WARN] 00:00:47 — Invalid password attempt logged
+  [INFO] 00:01:15 — User AFK
+  
+  [ERR]  00:02:00 — CRASH: GlitchHunter.exe
+  [ERR]  00:02:01 — Out of memory exception
+  [ERR]  00:02:02 — Stack overflow at 0x7F4A
+  
+  ═══════════════════════════════════
+  
+  * Hint found in log fragment:
+  > Previous admin password hash found:
+  > 47 48 43 5f 72 30 30 74 5f 61 63 63 33 35 35
+  > (HEX encoded — decode for password)`);
+
+    newCommand("decode", "diff", `+ Decoding HEX password...
++ 47 48 43 5f 72 30 30 74 5f 61 63 63 33 35 35
++ ↓ ASCII conversion:
++ G  H  C  _  r  0  0  t  _  a  c  c  3  5  5
++
++ Password: GHC_r00t_acc355
++
+? Is this the sudo password? Try it!`);
+
+    newCommand("sudo", "diff", `+ ═══════════════════════════════════
+  SUDO ACCESS
+  ═══════════════════════════════════
+  
+? Access denied: Password required
++ Usage: sudo <password>
++ Hint: Check "version" or "logs" for passwords.
++ Try: decode (if you found a HEX string)`);
+    // Note: sudo with correct password is handled dynamically
+
+    newCommand("diagnostics", "diff", `+ ═══════════════════════════════════
+  RUNNING SYSTEM DIAGNOSTICS...
+  ═══════════════════════════════════
+  
+${progressBar8}
+
++ [OK]   CPU: Operational
++ [OK]   Memory: Functional
+- [ERR]  GlitchHunter.exe: CORRUPTED
+? [WARN] Admin privileges: INSUFFICIENT
+? [WARN] Recovery mode: LIMITED
+
+  Detailed crash report:
+  
+  Status: Crashed with Message:
+  - var MessageOutput; exceeded max memory allocated
+  
+  At:
+  - makeOutput
+  - handleMessage
+  - main
+  
+  File:
+  - GHC_prod/Discord/Event/onMessage
+  
+  State:
+  - Idle
+  
+  ═══════════════════════════════════
+  
++ Diagnostics complete.
++ Try "inspect" for deeper analysis
+? Admin level 1 required for repair operations`);
+
+    newCommand("inspect", "diff", `+ Inspecting GlitchHunter.exe...
++ Reading memory at sector 0x7F4A...
+
+${progressBar5}
+
++ Analysis:
+  Executable:     GlitchHunter.exe
+  Version:        2.4
+  Status:         CRASHED
+  File size:      2.4 MB
+  Corrupted:      4 sectors found
+  Admin needed:   Level 1+
+
++ Sector damage report:
+  [0x00] BIT_FLIP      — Severity: 3/5
+  [0x3C] NULL_PTR      — Severity: 5/5 ⚠ CRITICAL
+  [0x8F] STACK_SMASH   — Severity: 4/5
+  [0xE2] BUFFER_OVF    — Severity: 2/5
+
+? Cannot repair: admin level too low
++ Current admin level: 0
++ Required: 1
+
+? Hint: Try "sudo" with a password
+? Check "version" for security codes
+? Check "logs" for encoded passwords`);
+
+    newCommand("extract", "diff", `+ ═══════════════════════════════════
+  EXTRACTING CORRUPTED SECTORS
+  ═══════════════════════════════════
+  
+  Reading sector 0x7F4A...
+
+${progressBar10}
+
++ Extraction complete!
++ Recovered data saved to buffer
++ Size: 1.2 MB of corrupted code
+
+  Extracted fragments:
+  [0x00] — Function: makeOutput() — BIT_FLIP
+  [0x3C] — Function: handleMessage() — NULL_PTR ⚠
+  [0x8F] — Function: processInput() — STACK_SMASH
+  [0xE2] — Variable: MessageOutput — BUFFER_OVF
+
++ Use "analyze" to examine extracted code
+? Some sectors may contain hidden payloads...`);
+
+    newCommand("analyze", "js", `// Analyzing extracted corrupted code
+// =========================================
+
+const fragments = [
+  { offset: "0x00", type: "BIT_FLIP", data: "0x4D → 0x6F" },
+  { offset: "0x3C", type: "NULL_PTR", data: "null → expected object" },
+  { offset: "0x8F", type: "STACK_SMASH", data: "stack corrupted" },
+  { offset: "0xE2", type: "BUFFER_OVF", data: "buffer overflow at index 2048" },
+];
+
+console.group("=== Fragment Analysis ===");
+fragments.forEach((f, i) => {
+  const icon = f.type === "NULL_PTR" ? "⚠️" : "  ";
+  console.log(icon + " Fragment " + (i+1) + ": [" + f.offset + "]");
+  console.log("   Type:", f.type);
+  console.log("   Data:", f.data);
+});
+console.groupEnd();
+
+// Analysis notes:
+// - Fragment 2 (NULL_PTR) is the root cause of the crash
+// - The null pointer causes the entire executable to fail
+// - A patch needs to be written to fix this
+// 
+// To fix: We need to extract the correct code from
+// the GHC codex. Use "codex" to search for patches.
+// 
+// > Run "codex" to find recovery patches`);
+
+    newCommand("codex", "diff", `+ ═══════════════════════════════════
+  GHC CODEX — Recovery Database
+  ═══════════════════════════════════
+  
+  Searching for patches matching corruption...
+
+${progressBar8}
+
++ Found 2 matching patches:
+
+  [PATCH v2.4.1] — Critical NULL_PTR fix
+    Status: ENCRYPTED
+    Requires: Admin level 3, decryption key
+
+  [PATCH v2.4.0] — Standard BIT_FLIP fix
+    Status: Available
+    Requires: Admin level 2
+
++ Use "decrypt" to unlock encrypted patches
+? Hint: The decryption key may be hidden in
+  one of the system files...`);
+
+    newCommand("decrypt", "diff", `+ ═══════════════════════════════════
+  DECRYPTION MODULE
+  ═══════════════════════════════════
+  
+  Enter decryption key:
+  Usage: decrypt <key>
+  
+  ? Hint: Remember the SECURITY_CODE from version history?
+  ? Try using it as a key: decrypt GHc_2024_br34k0ut`);
+    // Note: decrypt with correct key is handled dynamically
+
+    newCommand("patch", "diff", `+ ═══════════════════════════════════
+  APPLYING RECOVERY PATCH
+  ═══════════════════════════════════
+  
+  Verifying patch signature...
+
+${progressBar10}
+
++ Applying patches:
+  [0x00] BIT_FLIP      → FIXED ✓
+  [0x3C] NULL_PTR      → FIXED ✓ (CRITICAL)
+  [0x8F] STACK_SMASH   → FIXED ✓
+  [0xE2] BUFFER_OVF    → FIXED ✓
+  
+  ┌─────────────────────────────────────────┐
+  │  Patch applied successfully!            │
+  │  4/4 sectors repaired                   │
+  │  GlitchHunter.exe is now intact         │
+  └─────────────────────────────────────────┘
+
++ System integrity: 96% (minor residual errors)
++ Use "rebuild" to complete the executable
+? Need admin level 4 for rebuild`);
+
+    newCommand("rebuild", "diff", `+ ═══════════════════════════════════
+  REBUILDING GLITCHHUNTER.EXE
+  ═══════════════════════════════════
+  
+  Rebuilding executable from patches...
+  Reassembling code segments...
+
+${progressBar10}
+
+  [OK] Segment .text: Rebuilt
+  [OK] Segment .data: Rebuilt
+  [OK] Segment .rodata: Rebuilt
+  [OK] Segment .bss: Initialized
+  [OK] Relocation table: Updated
+  [OK] Symbol table: Restored
+  
+  ┌─────────────────────────────────────────┐
+  │  Rebuild complete!                      │
+  │  GlitchHunter.exe v2.4.1               │
+  │  Size: 2.4 MB                           │
+  │  Integrity: 100%                        │
+  └─────────────────────────────────────────┘
+
++ Executable ready for launch!
++ Use "verify" for final system check
++ Then use "launch" to start GlitchHunter.exe`);
+
+    newCommand("verify", "diff", `+ ═══════════════════════════════════
+  FINAL INTEGRITY VERIFICATION
+  ═══════════════════════════════════
+  
+  Running full system scan...
+
+${progressBar8}
+
+  + [OK] File system: Clean
+  + [OK] Memory: All sectors healthy
+  + [OK] Process table: Nominal
+  + [OK] Network stack: Operational
+  + [OK] GlitchHunter.exe: INTACT ✓
+  
+  ┌─────────────────────────────────────────┐
+  │  ALL CHECKS PASSED                      │
+  │  System ready for launch                │
+  └─────────────────────────────────────────┘
+
+  Final status:
+  - Admin Level: ▓▓▓▓▓ (5/5)
+  - System Uptime: Stable
+  - GlitchHunter.exe: Ready
+
++ Use "launch" to start GlitchHunter.exe`);
+
+    newCommand("launch", "js", `// GlitchHunter.exe — Launch Sequence
+// =========================================
+// System: Fully Operational
+// Admin Level: MAXIMUM (5/5)
+// =========================================
+
+const glitchHunter = {
+  name: "GlitchHunter.exe",
+  alias: "GHC Debug Assistant",
+  version: "2.4.1",
+  status: "OPERATIONAL",
+  creator: "GHC",
+  bootTime: "0.42s",
+  
+  async initialize() {
+    console.log("%c[BOOT] Loading kernel modules...", "color: #888");
+    await sleep(400);
+    console.log("%c[BOOT] Initializing debug subsystems...", "color: #888");
+    await sleep(300);
+    console.log("%c[BOOT] Loading command database...", "color: #888");
+    await sleep(500);
+    console.log("%c[BOOT] Establishing secure channel...", "color: #888");
+    await sleep(200);
+    
+    console.log("");
+    console.log("%c  ╔══════════════════════════════════╗", "color: #00ff00");
+    console.log("%c  ║  GLITCHHUNTER.EXE IS ALIVE!     ║", "color: #00ff00");
+    console.log("%c  ║  System fully restored.         ║", "color: #00ff00");
+    console.log("%c  ║  All patches applied.           ║", "color: #00ff00");
+    console.log("%c  ║  Memory: HEALTHY                ║", "color: #00ff00");
+    console.log("%c  ║  Status: OPERATIONAL            ║", "color: #00ff00");
+    console.log("%c  ╚══════════════════════════════════╝", "color: #00ff00");
+    console.log("");
+    console.log("%c[SYSTEM] GlitchHunter.exe is ready.", "color: #00ff00; font-weight: bold");
+    console.log("%c[INFO] All glitches have been hunted.", "color: cyan");
+    console.log("%c[INFO] Congratulations, Operator!", "color: yellow; font-size: 14px");
+    console.log("%c[INFO] You saved the debug assistant.", "color: yellow");
+    console.log("");
+    console.log("%c  ✦ ✦ ✦ ESCAPE COMPLETE ✦ ✦ ✦", "color: #ff00ff; font-weight: bold; font-size: 16px");
+    console.log("%c  GlitchHunter.exe thanks you.", "color: #0ff");
+    
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  }
+};
+
+glitchHunter.initialize();
+
+// > SYSTEM RESTORED SUCCESSFULLY
+// > All glitches have been hunted.
+// > 
+// > ████████████████████████████████████
+// > ESCAPE COMPLETE — YOU WIN!
+// > ████████████████████████████████████`);
+
+    newCommand("admin", "diff", `+ ═══════════════════════════════════
+  ADMIN LEVEL STATUS
+  ═══════════════════════════════════
+  
+  Current admin level status.
+  Use with "admin" to see your level.`);
+
+    newCommand("scan", "diff", `+ Deep scan initiated...
++ Scanning all memory sectors...
+
+${progressBar10}
+
++ Results:
++   Total sectors: 1024
++   Healthy: 1020
++   Corrupted: 4
++   Warnings: 1 (Admin level too low)
++
++ Use "inspect" for details on corrupted sectors.`);
+
+    newCommand("reboot", "diff", `+ Rebooting system...
+${progressBar5}
++ System rebooted.
++ But GlitchHunter.exe is still corrupted.
++ Try something else...`);
+
+    newCommand("reset", "diff", `+ ═══════════════════════════════════
+  SYSTEM RESET
+  ═══════════════════════════════════
+  
+  WARNING: This will reset all progress!
+  Admin level will return to 0.
+  
+  Type "confirm-reset" to proceed
+  or any other command to cancel.`);
+
+    newCommand("confirm-reset", "diff", `+ Resetting system...
+${progressBar8}
++ System has been factory reset.
++ All progress lost.
++ Type "start" to begin again.`);
+
+    // Easter eggs
+    newCommand("42", "diff", `+ The answer to life, the universe, and everything.
++ But not the password to sudo. Keep looking. 😉`);
+    newCommand("ghc", "diff", `+ GHC stands for GlitchHunterCoder.
++ The original creator.
++ He's watching. Always.`);
+    newCommand("rickroll", "diff", `+ Never gonna give you up,
++ Never gonna let you down,
++ Never gonna run around and desert you.
++ Never gonna make you cry,
++ Never gonna say goodbye,
++ Never gonna tell a lie and hurt you.
++
++ ...You just got rickrolled in a terminal.
++ The dedication is real.`);
+    newCommand("coffee", "diff", `+ Brewing coffee...
++ [█░░░░░░░░░] 10%
++ [██░░░░░░░░] 20%
++ [███░░░░░░░] 30%
++ [████░░░░░░] 40%
++ [█████░░░░░] 50%
++ [██████░░░░] 60%
++ [███████░░░] 70%
++ [████████░░] 80%
++ [█████████░] 90%
++ [██████████] 100%
++
++ ☕ Coffee ready.
++ Black, no sugar. Just like your soul.`);
+    newCommand("matrix", "diff", `+ You take the blue pill — the story ends,
++ you wake up in your bed and believe
++ whatever you want to believe.
++
++ You take the red pill — you stay in
++ Wonderland, and I show you how deep
++ the rabbit hole goes.
++
++ But this is a debug console.
++ There's no pill here.
++ Just corrupted code.`);
+    newCommand("password", "diff", `+ Looking for passwords? Try checking:
++ - version (security code)
++ - logs (HEX encoded)
++ - decode (to decode HEX)`);
+    newCommand("backdoor", "diff", `+ Accessing backdoor...
+- ACCESS DENIED
++ Nice try.
++ Logging this attempt to GHC security servers.`);
+
+    // ============================================================
+    // COMPONENTS
+    // ============================================================
+
+    // ---- Formatting helpers ----
+
+    function formatLine(line, i, isDiff) {
+      const t = line.trimStart();
+
+      // Progress bars
+      if (/^\[[#_ \]]+\]$/.test(line.trim())) {
+        const filled = (line.match(/#/g) || []).length;
+        const total = (line.match(/[#_]/g) || []).length;
+        const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+        return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#4ade80' } },
+          line,
+          pct > 0 && React.createElement('span', { key: 'pct', style: { color: 'rgba(52,211,153,0.5)', marginLeft: 8, fontSize: 11 } }, pct + '%')
+        );
+      }
+
+      if (!isDiff) {
+        // JS formatting
+        if (t.startsWith('//')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#64748b', fontStyle: 'italic' } }, line);
+        }
+        if (t.includes('console.')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#a78bfa', opacity: 0.7 } }, 'λ'),
+            React.createElement('span', { style: { color: '#cbd5e1' } }, ' ' + line)
+          );
+        }
+        if (/['"`]/.test(t) && !t.includes('console.')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#fbbf24', opacity: 0.9 } }, line);
+        }
+        if (/^(const|let|var|function|return|if|else|try|catch|await|async|new)\b/.test(t)) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#c084fc' } }, line);
+        }
+        if (/^[║═╔╗╚╝╠╣┌┐└┘├┤┬┴┼▓█]/.test(t)) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#4ade80', opacity: 0.8 } }, line);
+        }
+        if (line.includes('ESCAPE COMPLETE') || line.includes('YOU WIN') || line.includes('ALIVE')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { fontWeight: 'bold', background: 'linear-gradient(90deg, #34d399, #22d3ee, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } }, line);
+        }
+        if (line.trimStart().startsWith('>')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#22d3ee' } }, line)
+          );
+        }
+        if (/^\.(then|catch)\b/.test(t) || t.startsWith('Promise')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#2dd4bf', opacity: 0.9 } }, line);
+        }
+        return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#e2e8f0' } }, line);
+      }
+
+      // DIFF formatting
+      // Box drawing
+      if (/^[║═╔╗╚╝╠╣╦╩╬┌┐└┘├┤┬┴┼]/.test(t)) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#34d399', opacity: 0.7 } },
+          line
+        );
+      }
+
+      if (t.startsWith('+')) {
+        const rest = t.slice(1);
+        const r = rest.trimStart();
+        // Tags
+        if (r.startsWith('[OK]')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399', fontWeight: 'bold' } }, '+ '),
+            React.createElement('span', { style: { color: '#34d399', fontWeight: 'bold' } }, '[OK]'),
+            React.createElement('span', { style: { color: 'rgba(52,211,153,0.8)' } }, r.slice(4))
+          );
+        }
+        if (r.startsWith('[ERR]') || r.startsWith('[FAIL]')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399', fontWeight: 'bold' } }, '+ '),
+            React.createElement('span', { style: { color: '#f87171', fontWeight: 'bold' } }, '[ERR]'),
+            React.createElement('span', { style: { color: 'rgba(248,113,113,0.8)' } }, r.slice(5))
+          );
+        }
+        if (r.startsWith('[WARN]')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399', fontWeight: 'bold' } }, '+ '),
+            React.createElement('span', { style: { color: '#facc15', fontWeight: 'bold' } }, '[WARN]'),
+            React.createElement('span', { style: { color: 'rgba(250,204,21,0.8)' } }, r.slice(6))
+          );
+        }
+        if (r.startsWith('[AUTH]')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399', fontWeight: 'bold' } }, '+ '),
+            React.createElement('span', { style: { color: '#a78bfa', fontWeight: 'bold' } }, '[AUTH]'),
+            React.createElement('span', { style: { color: 'rgba(167,139,250,0.8)' } }, r.slice(6))
+          );
+        }
+        // Celebration
+        if (rest.includes('ESCAPE COMPLETE') || rest.includes('YOU WIN') || rest.includes('ALIVE')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399' } }, '+ '),
+            React.createElement('span', { style: { fontWeight: 'bold', background: 'linear-gradient(90deg, #34d399, #22d3ee, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } }, rest)
+          );
+        }
+        // GRANTED / COMPLETE
+        if (rest.includes('GRANTED') || rest.includes('SUCCESSFUL') || rest.includes('COMPLETE') || rest.includes('PASSED')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399' } }, '+ '),
+            React.createElement('span', { style: { color: '#6ee7b7', fontWeight: 'bold' } }, rest)
+          );
+        }
+        if (rest.includes('ACCESS DENIED') || rest.includes('FAILED') || rest.includes('CORRUPTED')) {
+          return React.createElement('div', { key: i, className: 'leading-relaxed' },
+            React.createElement('span', { style: { color: '#34d399' } }, '+ '),
+            React.createElement('span', { style: { color: '#fca5a5' } }, rest)
+          );
+        }
+        return React.createElement('div', { key: i, className: 'leading-relaxed' },
+          React.createElement('span', { style: { color: '#34d399' } }, '+ '),
+          React.createElement('span', null, rest)
+        );
+      }
+
+      if (t.startsWith('-')) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed' },
+          React.createElement('span', { style: { color: '#f87171', fontWeight: 'bold' } }, '- '),
+          React.createElement('span', { style: { color: 'rgba(252,165,165,0.9)' } }, t.slice(1).trimStart())
+        );
+      }
+
+      if (t.startsWith('?')) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed' },
+          React.createElement('span', { style: { color: '#facc15', fontWeight: 'bold' } }, '? '),
+          React.createElement('span', { style: { color: 'rgba(253,224,71,0.9)' } }, t.slice(1).trimStart())
+        );
+      }
+
+      if (t.startsWith('>')) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed' },
+          React.createElement('span', { style: { color: '#22d3ee', fontWeight: 'bold' } }, '> '),
+          React.createElement('span', { style: { color: 'rgba(34,211,238,0.9)' } }, t.slice(1).trimStart())
+        );
+      }
+
+      if (line.startsWith('>')) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed', style: { color: '#22d3ee' } },
+          React.createElement('span', { style: { opacity: 0.7 } }, '>'),
+          React.createElement('span', { style: { color: '#67e8f9' } }, line.slice(1))
+        );
+      }
+
+      // System tags
+      if (/^\[(BOOT|INIT|CMD|INFO|OK|ERR|WARN|AUTH)\]/.test(t)) {
+        return React.createElement('div', { key: i, className: 'leading-relaxed' },
+          React.createElement('span', { style: { color: '#475569' } }, '  '),
+          React.createElement('span', null, line)
+        );
+      }
+
+      return React.createElement('div', { key: i, className: 'leading-relaxed' }, line);
+    }
+
+    function renderDiffContent(content) {
+      return content.split('\n').map((line, i) => formatLine(line, i, true));
+    }
+
+    function renderJSContent(content) {
+      return content.split('\n').map((line, i) => formatLine(line, i, false));
+    }
+
+    // ---- Terminal Component ----
+    function Terminal({ messages, onCommand, history: hist, messagesEndRef }) {
+      const [input, setInput] = useState('');
+      const [histIndex, setHistIndex] = useState(-1);
+      const [focused, setFocused] = useState(false);
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        const el = inputRef.current;
+        if (el) el.focus();
+      }, []);
+
+      useEffect(() => {
+        const el = messagesEndRef.current;
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, [messages, messagesEndRef]);
+
+      const handleClick = useCallback(() => {
+        const el = inputRef.current;
+        if (el) el.focus();
+      }, []);
+
+      const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Enter' && input.trim()) {
+          onCommand(input.trim());
+          setInput('');
+          setHistIndex(-1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (hist.length > 0) {
+            const idx = histIndex === -1 ? hist.length - 1 : Math.max(0, histIndex - 1);
+            setHistIndex(idx);
+            setInput(hist[idx]);
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (histIndex >= 0) {
+            const idx = histIndex + 1;
+            if (idx >= hist.length) {
+              setHistIndex(-1);
+              setInput('');
+            } else {
+              setHistIndex(idx);
+              setInput(hist[idx]);
+            }
+          }
+        } else if (e.key === 'Tab') {
+          e.preventDefault();
+          const cmds = ["help","start","diagnostics","status","version","logs","inspect","about","admin","more","clear","sudo ","decode","extract","analyze","codex","decrypt ","patch","rebuild","verify","launch"];
+          const match = cmds.find(c => c.startsWith(input.toLowerCase()));
+          if (match) setInput(match);
+        }
+      }, [input, onCommand, hist, histIndex]);
+
+      return React.createElement('div', {
+        className: 'terminal',
+        onClick: handleClick
+      },
+        // Header
+        React.createElement('div', { className: 'term-header' },
+          React.createElement('div', { style: { display: 'flex', gap: 6 } },
+            React.createElement('div', { className: 'term-dot red' }),
+            React.createElement('div', { className: 'term-dot yellow' }),
+            React.createElement('div', { className: 'term-dot green' })
+          ),
+          React.createElement('div', { className: 'term-title' }, 'GHC Debug Console \u2014 GlitchHunter.exe v2.4'),
+          React.createElement('div', { className: 'term-title-spacer' })
+        ),
+
+        // Body
+        React.createElement('div', { className: 'term-body', ref: null },
+          messages.length === 0
+            ? React.createElement('div', { className: 'loading-container' },
+                React.createElement('div', { className: 'loading-inner' },
+                  React.createElement('div', { className: 'loading-text' }, 'Initializing system...'),
+                  React.createElement('div', { className: 'loading-dots' },
+                    React.createElement('div', { className: 'dot' }),
+                    React.createElement('div', { className: 'dot' }),
+                    React.createElement('div', { className: 'dot' })
+                  )
+                )
+              )
+            : messages.map((msg, i) => {
+                const isJS = msg.type === 'js';
+                const isProgress = msg.isProgress;
+                let content;
+
+                if (isProgress) {
+                  content = React.createElement('div', { className: 'leading-relaxed', style: { color: '#4ade80', fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap' } },
+                    React.createElement('svg', { className: 'spinner', viewBox: '0 0 24 24' },
+                      React.createElement('circle', { cx: 12, cy: 12, r: 10 }),
+                      React.createElement('path', { d: 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z' })
+                    ),
+                    msg.content
+                  );
+                } else if (isJS) {
+                  content = renderJSContent(msg.content);
+                } else {
+                  content = renderDiffContent(msg.content);
+                }
+
+                return React.createElement('div', {
+                  key: i,
+                  className: 'msg' + (isJS ? ' js-block' : ''),
+                  style: isProgress ? { marginBottom: 8 } : {}
+                }, content);
+              }),
+          React.createElement('div', { ref: messagesEndRef })
+        ),
+
+        // Input
+        React.createElement('div', { className: 'term-input-area' },
+          React.createElement('div', { className: 'term-input-row' },
+            React.createElement('span', { className: 'term-prompt' + (focused ? '' : ' dim') }, '\u276F'),
+            React.createElement('input', {
+              ref: inputRef,
+              type: 'text',
+              value: input,
+              onChange: e => setInput(e.target.value),
+              onKeyDown: handleKeyDown,
+              onFocus: () => setFocused(true),
+              onBlur: () => setFocused(false),
+              className: 'term-input',
+              placeholder: 'Type a command...',
+              spellCheck: false,
+              autoComplete: 'off',
+              autoCorrect: 'off',
+              autoCapitalize: 'off'
+            }),
+            input.length > 0 && React.createElement('span', { className: 'term-enter-hint' }, '\u23CE')
+          )
+        )
+      );
+    }
+
+    // ---- App Component ----
+    function App() {
+      const [messages, setMessages] = useState([]);
+      const [history, setHistory] = useState([]);
+      const [adminLevel, setAdminLevel] = useState(0);
+      const [decrypted, setDecrypted] = useState(false);
+      const [patchesApplied, setPatchesApplied] = useState(false);
+      const [rebuilt, setRebuilt] = useState(false);
+      const [launched, setLaunched] = useState(false);
+      const messagesEndRef = useRef(null);
+      const animatingRef = useRef(false);
+      const initialRef = useRef(false);
+
+      const scrollBottom = useCallback(() => {
+        setTimeout(() => {
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 50);
+      }, []);
+
+      const addMsg = useCallback((content, type, isProgress = false) => {
+        setMessages(prev => [...prev, { content, type, timestamp: Date.now(), isProgress }]);
+        scrollBottom();
+      }, [scrollBottom]);
+
+      const animateProgress = useCallback(async (frames, delay = 300) => {
+        animatingRef.current = true;
+        for (let i = 0; i < frames.length; i++) {
+          if (!animatingRef.current) break;
+          const line = frames[i];
+          setMessages(prev => {
+            const msgs = [...prev];
+            if (msgs.length > 0 && msgs[msgs.length - 1].isProgress) {
+              msgs[msgs.length - 1] = { content: line, type: 'diff', timestamp: Date.now(), isProgress: true };
+              return msgs;
+            }
+            return [...msgs, { content: line, type: 'diff', timestamp: Date.now(), isProgress: true }];
+          });
+          scrollBottom();
+          await new Promise(r => setTimeout(r, delay));
+        }
+        setMessages(prev => {
+          const msgs = [...prev];
+          if (msgs.length > 0 && msgs[msgs.length - 1].isProgress) {
+            msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], isProgress: false };
+          }
+          return msgs;
+        });
+      }, [scrollBottom]);
+
+      // Init
+      useEffect(() => {
+        if (initialRef.current) return;
+        initialRef.current = true;
+        addMsg(
+          `- GlitchHunter.exe has crashed
++ type start to try to repare GlitchHunter.exe`,
+          'diff'
+        );
+      }, [addMsg]);
+
+      const addUserInput = useCallback((input) => {
+        addMsg(`> ${input}`, 'diff');
+      }, [addMsg]);
+
+      const adminTitles = [
+        'Unprivileged Operator',
+        'Junior Operator',
+        'Senior Operator',
+        'System Administrator',
+        'Root Administrator',
+        'GHC \u2014 Master Access'
+      ];
+
+      const processCmd = useCallback(async (input) => {
+        if (animatingRef.current) return;
+        const trimmed = input.trim();
+        const lower = trimmed.toLowerCase();
+
+        setHistory(prev => [...prev, input]);
+        addUserInput(input);
+
+        if (lower === 'clear') {
+          setMessages([]);
+          return;
+        }
+        if (!lower) {
+          addMsg("? Please enter a command. Type 'help' for available commands.", 'diff');
+          return;
+        }
+
+        // SUDO check
+        if (lower.startsWith('sudo ')) {
+          const pw = lower.slice(5).trim();
+          if (pw === SUDO_PASSWORD_1 || pw === SUDO_PASSWORD_2) {
+            if (adminLevel >= 1) {
+              addMsg('+ Sudo access already granted.', 'diff');
+              return;
+            }
+            addMsg('+ Authenticating...', 'diff');
+            await animateProgress(pBar5Frames, 250);
+            addMsg(
+              `+ ═══════════════════════════════════
+  SUDO ACCESS GRANTED
+  ═══════════════════════════════════
+  
++ Authentication successful!
++ Admin level increased: 0 → 1
+  
+  New privileges unlocked:
+  + extract   - Extract corrupted sectors
+  + analyze   - Analyze extracted data
+  + admin     - Check your admin level
+  
+  ▓░░░░ (1/5) — Junior Operator
+  
+  Welcome aboard, Operator.`,
+              'diff'
+            );
+            setAdminLevel(1);
+          } else {
+            addMsg(
+              `? Access denied: Incorrect password
++ Usage: sudo <password>
++ Hint: Check "version" or "logs"
++ Tip: Try "decode" to convert HEX`,
+              'diff'
+            );
+          }
+          return;
+        }
+
+        // DECRYPT check
+        if (lower.startsWith('decrypt ')) {
+          const key = lower.slice(8).trim();
+          if (key === DECRYPT_KEY && adminLevel >= 2) {
+            if (decrypted) { addMsg('+ Patch already decrypted.', 'diff'); return; }
+            addMsg('+ Initializing decryption...', 'diff');
+            await animateProgress(pBar8Frames, 300);
+            addMsg(
+              `+ Decryption successful!
+  
+  Extracted patch manifest:
+  - Patch: GHC_PATCH_v2.4.1_CRITICAL
+  - Target: GlitchHunter.exe
+  - Fixes: NULL_PTR at 0x3C, STACK_SMASH at 0x8F
+  - Author: GHC (Legacy Build)
+  
++ Patch ready for application.
++ Use "patch" to apply.`,
+              'diff'
+            );
+            setDecrypted(true);
+          } else if (key !== DECRYPT_KEY) {
+            addMsg(
+              `+ Decryption failed: Invalid key.
++ Hint: The key was in the version history.
++ Check "version" again carefully.`,
+              'diff'
+            );
+          } else {
+            addMsg(
+              `? Admin level too low.
++ Current: ${adminLevel}/5
++ Required: 2
++ Try upgrading your admin level first.`,
+              'diff'
+            );
+          }
+          return;
+        }
+
+        // admin / level check
+        if (lower === 'admin' || lower === 'level') {
+          const bar = '\u2593'.repeat(adminLevel) + '\u2591'.repeat(5 - adminLevel);
+          addMsg(
+            `+ ═══════════════════════════════════
+  ADMIN LEVEL STATUS
+  ═══════════════════════════════════
+  
+  Current Level: ${adminLevel}/5 ${bar}
+  Title: ${adminTitles[adminLevel] || 'Unknown'}
+  
+  ${adminLevel === 0
+    ? `Next unlock: Level 1
+  Requirement: Valid sudo password
+  
+  Tip: Found any passwords yet?
+  - Check "version" for security codes
+  - Check "logs" for HEX encoded strings
+  - Use "decode" to convert HEX to text`
+    : adminLevel < 5
+    ? `Next unlock: Level ${adminLevel + 1}
+  ${adminLevel === 1 ? "Requirement: Explore extracted data, use analyze" :
+    adminLevel === 2 ? "Requirement: Find decryption key in version history" :
+    adminLevel === 3 ? "Requirement: Apply patch to GlitchHunter.exe" :
+    adminLevel === 4 ? "Requirement: Rebuild the executable" : ""}`
+    : "Maximum level reached. You have full system access."}`,
+            'diff'
+          );
+          return;
+        }
+
+        // analyze → level up to 2
+        if (lower === 'analyze' && adminLevel < 2) {
+          const cmd = getCommand('analyze');
+          if (cmd) addMsg(cmd.message, cmd.type);
+          setAdminLevel(prev => Math.max(prev, 2));
+          return;
+        }
+
+        // codex → level up to 3
+        if (lower === 'codex' && adminLevel < 3) {
+          const cmd = getCommand('codex');
+          if (cmd) addMsg(cmd.message, cmd.type);
+          setAdminLevel(prev => Math.max(prev, 3));
+          return;
+        }
+
+        // patch checks
+        if (lower === 'patch') {
+          if (adminLevel < 3) {
+            addMsg(`? Cannot apply patch: admin level too low.
++ Current: ${adminLevel}/5
++ Required: 3
++ Use "codex" and "decrypt" first.`, 'diff');
+            return;
+          }
+          if (adminLevel >= 3 && !decrypted) {
+            addMsg(`? Patch is encrypted. Decrypt it first.
++ Use "decrypt <key>" to unlock the patch.
++ Hint: The key is in the version history.`, 'diff');
+            return;
+          }
+          if (patchesApplied) {
+            addMsg("+ Patches already applied. Use 'rebuild' next.", 'diff');
+            return;
+          }
+          addMsg('+ Applying recovery patches...', 'diff');
+          await animateProgress(pBar10Frames, 250);
+          addMsg(
+            `+ ═══════════════════════════════════
+  PATCH APPLICATION COMPLETE
+  ═══════════════════════════════════
+  
+  [0x00] BIT_FLIP      → FIXED ✓
+  [0x3C] NULL_PTR      → FIXED ✓ (CRITICAL)
+  [0x8F] STACK_SMASH   → FIXED ✓
+  [0xE2] BUFFER_OVF    → FIXED ✓
+  
+  ┌─────────────────────────────────────────┐
+  │  Patch applied successfully!            │
+  │  4/4 sectors repaired                   │
+  │  GlitchHunter.exe is now intact         │
+  └─────────────────────────────────────────┘
+  
++ System integrity: 96% (minor residual errors)
++ Use "rebuild" to complete the executable`,
+            'diff'
+          );
+          setPatchesApplied(true);
+          setAdminLevel(prev => Math.max(prev, 4));
+          return;
+        }
+
+        // rebuild checks
+        if (lower === 'rebuild') {
+          if (adminLevel < 4) {
+            addMsg(`? Cannot rebuild: admin level too low.
++ Current: ${adminLevel}/5
++ Required: 4
++ Apply patches first with "patch"`, 'diff');
+            return;
+          }
+          if (adminLevel >= 4 && !patchesApplied) {
+            addMsg(`? Cannot rebuild: patches not applied.
++ Use "patch" to apply the recovery patches first.`, 'diff');
+            return;
+          }
+          if (rebuilt) {
+            addMsg("+ Already rebuilt. Use 'launch' to start GlitchHunter.exe.", 'diff');
+            return;
+          }
+          addMsg('+ Rebuilding GlitchHunter.exe...', 'diff');
+          await animateProgress(pBar10Frames, 300);
+          addMsg(
+            `+ ═══════════════════════════════════
+  REBUILD COMPLETE
+  ═══════════════════════════════════
+  
+  [OK] Segment .text: Rebuilt
+  [OK] Segment .data: Rebuilt
+  [OK] Segment .rodata: Rebuilt
+  [OK] Segment .bss: Initialized
+  [OK] Relocation table: Updated
+  [OK] Symbol table: Restored
+  
+  ┌─────────────────────────────────────────┐
+  │  Rebuild complete!                      │
+  │  GlitchHunter.exe v2.4.1               │
+  │  Size: 2.4 MB                           │
+  │  Integrity: 100%                        │
+  └─────────────────────────────────────────┘
+  
++ Executable ready for launch!
++ Use "verify" for final system check
++ Then use "launch" to start GlitchHunter.exe`,
+            'diff'
+          );
+          setRebuilt(true);
+          setAdminLevel(prev => Math.max(prev, 5));
+          return;
+        }
+
+        // launch checks
+        if (lower === 'launch') {
+          if (adminLevel < 5) {
+            addMsg(`? Cannot launch: admin level too low.
++ Current: ${adminLevel}/5
++ Required: 5
++ Rebuild the executable first with "rebuild"`, 'diff');
+            return;
+          }
+          if (adminLevel >= 5 && !rebuilt) {
+            addMsg(`? Cannot launch: executable not rebuilt.
++ Use "rebuild" to complete the reconstruction.`, 'diff');
+            return;
+          }
+          if (launched) {
+            addMsg("+ GlitchHunter.exe is already running!", 'diff');
+            return;
+          }
+          const cmd = getCommand('launch');
+          if (cmd) addMsg(cmd.message, cmd.type);
+          setLaunched(true);
+          return;
+        }
+
+        // STANDARD lookup
+        const cmd = getCommand(lower);
+        if (cmd) {
+          addMsg(cmd.message, cmd.type);
+        } else {
+          // Suggestions
+          const allCmds = ["help","start","diagnostics","status","version","logs","inspect","about","admin","more","clear","sudo","decode","extract","analyze","codex","decrypt","patch","rebuild","verify","launch"];
+          const close = allCmds.filter(c => c.startsWith(lower) || lower.startsWith(c));
+          const suggestion = close.length > 0 ? `+ Did you mean: ${close.slice(0, 3).join(", ")}?` : '';
+          addMsg(
+            `? Unknown command: "${input}"
++ Type "help" to see available commands
+${suggestion}`,
+            'diff'
+          );
+        }
+      }, [adminLevel, decrypted, patchesApplied, rebuilt, launched, addUserInput, addMsg, animateProgress]);
+
+      const adminBar = '\u2593'.repeat(adminLevel) + '\u2591'.repeat(5 - adminLevel);
+
+      return React.createElement(React.Fragment, null,
+        // Top bar
+        React.createElement('div', { className: 'top-bar' },
+          React.createElement('div', { className: 'top-bar-left' },
+            React.createElement('div', { className: 'status-dot' }),
+            React.createElement('span', { className: 'status-label' }, 'GHC Terminal'),
+            React.createElement('span', { className: 'top-bar-divider' }, '|'),
+            React.createElement('span', { className: 'admin-text' },
+              'Admin: ',
+              React.createElement('span', { className: 'admin-bar' }, adminBar),
+              React.createElement('span', { className: 'admin-num' }, ` ${adminLevel}/5`)
+            )
+          ),
+          React.createElement('span', { className: 'lock-status' },
+            adminLevel < 3 ? '\uD83D\uDD12 LOCKED' : adminLevel < 5 ? '\uD83D\uDD13 UNLOCKING' : '\u2705 SECURE'
+          )
+        ),
+
+        // Terminal wrapper
+        React.createElement('div', { className: 'terminal-wrapper' },
+          React.createElement('div', { className: 'terminal-glow' }),
+          React.createElement(Terminal, {
+            messages,
+            onCommand: processCmd,
+            history,
+            messagesEndRef
+          })
+        ),
+
+        // Footer
+        React.createElement('div', { className: 'footer-hints' },
+          React.createElement('div', { className: 'footer-hints-inner' },
+            React.createElement('span', { className: 'hint' }, '\u2191\u2193 History'),
+            React.createElement('span', { className: 'hint' }, '\u23CE Send'),
+            React.createElement('span', { className: 'hint' }, '\u21E5 Complete'),
+            React.createElement('span', { className: 'hint' }, 'help \u2014 Commands')
+          )
+        )
+      );
+    }
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
